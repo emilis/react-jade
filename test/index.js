@@ -5,9 +5,11 @@ var assert = require('assert');
 var test = require('testit');
 var rimraf = require('rimraf').sync;
 var htmlparser = require('htmlparser2');
+var unescapeHtml = require('unescape-html');
 var mockDom = require('./mock-dom.js');
 var jade = require('../');
 var React = require('react');
+var ReactDOM = require('react-dom/server')
 
 var outputDir = __dirname + '/output';
 var inputDir = __dirname + '/jade/test/cases';
@@ -27,9 +29,7 @@ fs.readdirSync(inputDir).filter(function (name) {
     !/filter/.test(name) &&
     !/case/.test(name) &&
     'xml.jade' !== name &&
-    'tag.interpolation.jade' !== name &&
     'scripts.non-js.jade' !== name &&
-    'namespaces.jade' !== name &&
     'html.jade' !== name &&
     'html5.jade' !== name &&
     'escape-test.jade' !== name &&
@@ -37,18 +37,11 @@ fs.readdirSync(inputDir).filter(function (name) {
     'regression.784.jade' !== name &&
     'tags.self-closing.jade' !== name &&
     'interpolation.escape.jade' !== name &&
-    'include.yield.nested.jade' !== name &&
-    'escaping-class-attribute.jade' !== name &&
     'each.else.jade' !== name &&
     'includes.jade' !== name &&
     'code.iteration.jade' !== name &&
     'code.escape.jade' !== name &&
     'blockquote.jade' !== name &&
-    'mixin.attrs.jade' !== name &&
-    'mixin.merge.jade' !== name &&
-    'attrs.js.jade' !== name &&
-    'attrs.jade' !== name &&
-    'attrs.interpolation.jade' !== name &&
     'attrs-data.jade' !== name &&
     'blocks-in-blocks.jade' !== name &&
     'blocks-in-if.jade' !== name;
@@ -88,6 +81,16 @@ function domToString(dom, indent) {
     }).join('\n');
   }
   indent = indent || '';
+  if (dom.attribs) {
+    var sortedAttribs = {};
+    Object.keys(dom.attribs).sort().forEach(function (key) {
+      sortedAttribs[key] = unescapeHtml(dom.attribs[key]);
+    });
+    dom.attribs = sortedAttribs;
+  }
+  if (dom.attribs && dom.attribs.style) {
+    dom.attribs.style = dom.attribs.style.split(';').sort().join(';');
+  }
   if (dom.type === 'script' || dom.type === 'style' || dom.type === 'tag' && (dom.name === 'script' || dom.name === 'style')) {
     return indent + dom.name + ' ' + JSON.stringify(dom.attribs);
   } else if (dom.type === 'tag') {
@@ -158,7 +161,7 @@ fs.readdirSync(bonusDir).filter(function (name) {
   test(name, function () {
     var fn = jade.compileFile(bonusDir + '/' + name + '.jade');
     var c = React.createClass({ render: fn });
-    var html = React.renderToStaticMarkup(React.createElement(c, { title: 'Jade', list: ['a', 'b', 'c']}));
+    var html = ReactDOM.renderToStaticMarkup(React.createElement(c, { title: 'Jade', list: ['a', 'b', 'c']}));
 
     var actual = htmlparser.parseDOM(html);
     var expected = htmlparser.parseDOM(fs.readFileSync(bonusDir + '/' + name + '.html', 'utf8'));
@@ -182,7 +185,7 @@ test('bonus-features/component-composition.jade', function () {
     render: render2
   });
 
-  var html = React.renderToStaticMarkup(React.createElement(c, { title: 'Jade', items: [ 'a', 'b', 'c' ]}));
+  var html = ReactDOM.renderToStaticMarkup(React.createElement(c, { title: 'Jade', items: [ 'a', 'b', 'c' ]}));
 
   var actual = htmlparser.parseDOM(html);
   var expected = htmlparser.parseDOM(fs.readFileSync(bonusDir + '/' + name + '.html', 'utf8'));
@@ -221,4 +224,14 @@ test('bonus-features/browserify - error reporting', function (done) {
       assert(/var templateA \= jade\`/.test(err.message));
       return done();
     }).resume();
+});
+
+test('bonus-features/browserify - pass through JSON', function (done) {
+  fs.createReadStream(require.resolve('../package.json'))
+    .pipe(jade(require.resolve('../package.json')))
+    .pipe(fs.createWriteStream(__dirname + '/output/test-client-pass-through.json'))
+    .on('close', function () {
+      require('./output/test-client-pass-through');
+      done();
+    });
 });

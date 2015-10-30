@@ -74,7 +74,7 @@ If you are using ES6 server side, or the browserify transform client side (even 
 var TodoList = React.createClass({
   render: jade`
 ul
-  - each item in this.props.items
+  each item in this.props.items
     li= item
 `
 });
@@ -110,7 +110,7 @@ var jade = require('react-jade');
 
 ### jade(options) / jade(file)
 
-Acts as a browseify transform to inline calls to `jade.compileFile`.  The source code looks something like:
+Acts as a browserify transform to inline calls to `jade.compileFile`.  The source code looks something like:
 
 ```js
 function browserify(options) {
